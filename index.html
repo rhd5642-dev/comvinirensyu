@@ -568,4 +568,403 @@
                     category: document.getElementById('input-category').value,
                     korean: document.getElementById('input-korean').value.trim(),
                     japanese: document.getElementById('input-japanese').value.trim(),
-                    hiragana
+                    hiragana: document.getElementById('input-hiragana').value.trim(),
+                    koreanPron: document.getElementById('input-korean-pron').value.trim()
+                };
+
+                if (editId) {
+                    const idx = sentences.findIndex(s => s.id === Number(editId));
+                    if (idx !== -1) sentences[idx] = newSentence;
+                    showToast("문장이 수정되었습니다!", "success");
+                } else {
+                    sentences.push(newSentence);
+                    showToast("새 문장이 추가되었습니다!", "success");
+                }
+
+                await saveSentencesToGAS();
+                addModal.classList.add('hidden');
+                document.getElementById('add-sentence-form').reset();
+                applyCategoryFilter(activeCategory);
+                if (!document.getElementById('stats-modal').classList.contains('hidden')) {
+                    openStatsModal();
+                }
+            });
+
+            const statsModal = document.getElementById('stats-modal');
+            document.getElementById('stats-toggle-btn').addEventListener('click', openStatsModal);
+            document.getElementById('close-stats-modal').addEventListener('click', () => statsModal.classList.add('hidden'));
+            document.getElementById('close-stats-modal-btn').addEventListener('click', () => statsModal.classList.add('hidden'));
+
+            document.getElementById('reset-all-progress-btn').addEventListener('click', () => {
+                starredIds.clear();
+                masteredIds.clear();
+                updateCardDisplay();
+                openStatsModal();
+                showToast("학습 기록이 초기화되었습니다.");
+            });
+
+            document.getElementById('copy-header-btn').addEventListener('click', () => {
+                openStatsModal();
+            });
+
+            document.getElementById('copy-report-btn').addEventListener('click', generateAndCopyReport);
+        }
+
+        function openSentenceModal(sentenceObj = null) {
+            const modal = document.getElementById('add-modal');
+            const title = document.getElementById('modal-title');
+            const submitBtn = document.getElementById('submit-sentence-btn');
+            
+            if (sentenceObj) {
+                title.innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-500"></i><span>회화 문장 수정</span>`;
+                document.getElementById('input-edit-id').value = sentenceObj.id;
+                document.getElementById('input-category').value = sentenceObj.category;
+                document.getElementById('input-korean').value = sentenceObj.korean;
+                document.getElementById('input-japanese').value = sentenceObj.japanese;
+                document.getElementById('input-hiragana').value = sentenceObj.hiragana;
+                document.getElementById('input-korean-pron').value = sentenceObj.koreanPron;
+                submitBtn.innerText = "수정하기";
+            } else {
+                title.innerHTML = `<i class="fa-solid fa-plus text-indigo-600"></i><span>새로운 회화 문장 추가</span>`;
+                document.getElementById('add-sentence-form').reset();
+                document.getElementById('input-edit-id').value = "";
+                submitBtn.innerText = "저장하기";
+            }
+            modal.classList.remove('hidden');
+        }
+
+        async function deleteSentence(id) {
+            if (confirm("이 문장을 삭제하시겠습니까?")) {
+                sentences = sentences.filter(s => s.id !== id);
+                await saveSentencesToGAS();
+                applyCategoryFilter(activeCategory);
+                openStatsModal();
+                showToast("문장이 삭제되었습니다.", "error");
+            }
+        }
+
+        function switchMode(mode) {
+            activeMode = mode;
+            document.querySelectorAll('.mode-tab').forEach(btn => {
+                btn.className = (btn.getAttribute('data-mode') === mode)
+                    ? "mode-tab px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-indigo-600 text-white shadow-sm transition flex items-center space-x-2"
+                    : "mode-tab px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 transition flex items-center space-x-2";
+            });
+
+            document.querySelectorAll('.mode-sec').forEach(sec => sec.classList.add('hidden'));
+            document.getElementById(`sec-${mode}`).classList.remove('hidden');
+
+            if (mode === "voice") loadVoiceTarget();
+            if (mode === "puzzle") loadPuzzleTarget();
+        }
+
+        function applyCategoryFilter(cat) {
+            activeCategory = cat;
+            if (cat === "ALL") filteredSentences = [...sentences];
+            else if (cat === "BOOKMARK") filteredSentences = sentences.filter(s => starredIds.has(s.id));
+            else filteredSentences = sentences.filter(s => s.category === cat);
+
+            if (isShuffle && filteredSentences.length > 0) filteredSentences.sort(() => 0.5 - Math.random());
+            currentIndex = 0;
+            isFlipped = false;
+            updateCardDisplay();
+        }
+
+        function updateCardDisplay() {
+            if (isFlipped) {
+                document.getElementById('flashcard').classList.remove('card-flipped');
+                isFlipped = false;
+                document.getElementById('flip-btn-text').innerText = "정답 보기";
+            }
+
+            document.getElementById('star-count').innerText = starredIds.size;
+            document.getElementById('mastered-count').innerText = masteredIds.size;
+
+            const total = filteredSentences.length;
+            if (total === 0) {
+                document.getElementById('progress-text').innerText = "진행률: 0 / 0";
+                document.getElementById('progress-bar').style.width = "0%";
+                document.getElementById('korean-prompt').innerText = "등록된 문장이 없습니다!";
+                return;
+            }
+
+            document.getElementById('progress-text').innerText = `진행률: ${currentIndex + 1} / ${total}`;
+            document.getElementById('progress-bar').style.width = `${((currentIndex + 1) / total) * 100}%`;
+
+            const cur = filteredSentences[currentIndex];
+            document.getElementById('korean-prompt').innerText = cur.korean;
+            document.getElementById('jp-text').innerText = cur.japanese;
+            document.getElementById('hiragana-text').innerText = cur.hiragana;
+            document.getElementById('korean-pron-text').innerText = cur.koreanPron;
+            document.getElementById('card-badge').innerText = cur.category === "1" ? "점원 표현" : "손님 표현";
+
+            document.getElementById('star-btn').innerHTML = starredIds.has(cur.id)
+                ? '<i class="fa-solid fa-star text-amber-400"></i>'
+                : '<i class="fa-regular fa-star text-slate-300"></i>';
+        }
+
+        function flipCard() {
+            if (filteredSentences.length === 0) return;
+            isFlipped = !isFlipped;
+            const fc = document.getElementById('flashcard');
+            if (isFlipped) {
+                fc.classList.add('card-flipped');
+                document.getElementById('flip-btn-text').innerText = "문제 보기";
+            } else {
+                fc.classList.remove('card-flipped');
+                document.getElementById('flip-btn-text').innerText = "정답 보기";
+            }
+        }
+
+        function playSpeech(textOrRate, rateOption = 1.0) {
+            let text = (typeof textOrRate === "string") ? textOrRate : (filteredSentences[currentIndex]?.japanese || "");
+            let rate = (typeof textOrRate === "number") ? textOrRate : rateOption;
+
+            if ('speechSynthesis' in window && text) {
+                window.speechSynthesis.cancel();
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.lang = 'ja-JP';
+                utter.rate = rate;
+                window.speechSynthesis.speak(utter);
+            }
+        }
+
+        let vIndex = 0;
+        function setupVoiceEvaluation() {
+            const micBtn = document.getElementById('v-mic-btn');
+            const statusMsg = document.getElementById('v-status-msg');
+
+            micBtn.addEventListener('click', () => {
+                if (!recognition) {
+                    showToast("음성 인식을 지원하지 않는 브라우저입니다.", "error");
+                    return;
+                }
+                micBtn.classList.add('pulse-ring');
+                statusMsg.innerText = "듣고 있습니다... 일본어로 말씀하세요!";
+
+                recognition.start();
+
+                recognition.onresult = (event) => {
+                    micBtn.classList.remove('pulse-ring');
+                    const speechResult = event.results[0][0].transcript;
+                    document.getElementById('v-user-said').innerText = `"${speechResult}"`;
+
+                    const targetText = sentences[vIndex].japanese.replace(/[。？\s]/g, '');
+                    const cleanResult = speechResult.replace(/[。？\s]/g, '');
+
+                    let score = (cleanResult === targetText) ? 100 : (targetText.includes(cleanResult) ? 80 : 50);
+                    const badge = document.getElementById('v-score-badge');
+                    badge.className = "px-2.5 py-1 bg-emerald-500 text-white rounded-lg text-xs font-black";
+                    badge.innerText = `${score}점`;
+                    statusMsg.innerText = "평가가 완료되었습니다!";
+                };
+
+                recognition.onerror = () => {
+                    micBtn.classList.remove('pulse-ring');
+                    statusMsg.innerText = "음성 인식 실패";
+                };
+            });
+
+            document.getElementById('v-listen-target-btn').addEventListener('click', () => {
+                if (sentences[vIndex]) playSpeech(sentences[vIndex].japanese, 1.0);
+            });
+
+            document.getElementById('v-next-btn').addEventListener('click', () => {
+                if (sentences.length === 0) return;
+                vIndex = (vIndex + 1) % sentences.length;
+                loadVoiceTarget();
+            });
+        }
+
+        function loadVoiceTarget() {
+            if (sentences.length === 0) return;
+            const item = sentences[vIndex];
+            document.getElementById('v-korean').innerText = item.korean;
+            document.getElementById('v-target-jp').innerText = `${item.japanese} (${item.koreanPron})`;
+        }
+
+        let puzIndex = 0;
+        let selectedBlockObjects = [];
+
+        function setupPuzzleQuiz() {
+            document.getElementById('puz-reset-btn').addEventListener('click', loadPuzzleTarget);
+            document.getElementById('puz-hint-sound-btn').addEventListener('click', () => {
+                if (sentences[puzIndex]) playSpeech(sentences[puzIndex].japanese, 0.85);
+            });
+
+            document.getElementById('puz-check-btn').addEventListener('click', () => {
+                const userSentence = selectedBlockObjects.map(b => b.text).join("");
+                const item = sentences[puzIndex];
+                if (userSentence.replace(/\s+/g, '') === item.japanese.replace(/\s+/g, '')) {
+                    showToast("🎉 정답입니다!", "success");
+                    playSpeech(item.japanese, 1.0);
+                    setTimeout(() => {
+                        puzIndex = (puzIndex + 1) % sentences.length;
+                        loadPuzzleTarget();
+                    }, 1200);
+                } else {
+                    showToast("오답입니다. 다시 맞춰보세요!", "error");
+                }
+            });
+        }
+
+        function loadPuzzleTarget() {
+            if (sentences.length === 0) return;
+            const item = sentences[puzIndex];
+            document.getElementById('puz-korean').innerText = item.korean;
+
+            const chars = item.japanese.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+|[。？]/g) || [item.japanese];
+            const targetBlocks = chars.map(c => ({ text: c, pron: "" }));
+
+            selectedBlockObjects = [];
+            renderPuzzleBoxes(targetBlocks);
+        }
+
+        function renderPuzzleBoxes(blocks) {
+            const poolBox = document.getElementById('puz-pool-box');
+            const answerBox = document.getElementById('puz-answer-box');
+            poolBox.innerHTML = '';
+            answerBox.innerHTML = '<span class="text-xs text-slate-400 font-bold">블록을 터치해 순서대로 만드세요</span>';
+
+            const shuffled = blocks.map((b, idx) => ({ ...b, originalIdx: idx })).sort(() => 0.5 - Math.random());
+
+            shuffled.forEach((blockObj) => {
+                const btn = document.createElement('button');
+                btn.className = "px-3.5 py-2 bg-indigo-50 border-2 border-indigo-200 text-indigo-900 rounded-2xl font-bold active:scale-95";
+                btn.innerText = blockObj.text;
+
+                btn.addEventListener('click', () => {
+                    if (answerBox.querySelector('span')) answerBox.innerHTML = '';
+
+                    selectedBlockObjects.push(blockObj);
+                    btn.style.display = 'none';
+
+                    const slot = document.createElement('button');
+                    slot.className = "px-3.5 py-2 bg-emerald-600 text-white rounded-2xl font-bold active:scale-95";
+                    slot.innerText = blockObj.text;
+
+                    slot.addEventListener('click', () => {
+                        slot.remove();
+                        selectedBlockObjects = selectedBlockObjects.filter(b => b.originalIdx !== blockObj.originalIdx);
+                        btn.style.display = 'inline-block';
+                        if (selectedBlockObjects.length === 0) {
+                            answerBox.innerHTML = '<span class="text-xs text-slate-400 font-bold">블록을 터치해 순서대로 만드세요</span>';
+                        }
+                    });
+
+                    answerBox.appendChild(slot);
+                });
+
+                poolBox.appendChild(btn);
+            });
+        }
+
+        function openStatsModal() {
+            document.getElementById('modal-total-count').innerText = sentences.length;
+            document.getElementById('modal-mastered-count').innerText = masteredIds.size;
+            document.getElementById('modal-starred-count').innerText = starredIds.size;
+
+            const listContainer = document.getElementById('sentence-list-container');
+            listContainer.innerHTML = '';
+
+            sentences.forEach((s) => {
+                const item = document.createElement('div');
+                item.className = 'p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs sm:text-sm';
+                item.innerHTML = `
+                    <div class="flex flex-col space-y-1 max-w-[65%]">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 font-bold text-[10px] rounded-md">${s.category === "1" ? "점원" : "손님"}</span>
+                            <span class="font-black text-slate-800 truncate">${s.korean}</span>
+                        </div>
+                        <div class="text-slate-600 text-xs">${s.japanese} <span class="text-indigo-500">(${s.koreanPron})</span></div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick='openSentenceModal(${JSON.stringify(s)})' class="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold rounded-lg text-xs">수정</button>
+                        <button onclick="deleteSentence(${s.id})" class="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold rounded-lg text-xs">삭제</button>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+
+            document.getElementById('stats-modal').classList.remove('hidden');
+        }
+
+        function generateAndCopyReport() {
+            const totalCount = sentences.length;
+            const masteredCount = masteredIds.size;
+            const percent = totalCount > 0 ? Math.round((masteredCount / totalCount) * 100) : 0;
+            const isCompletedAll = totalCount > 0 && masteredCount === totalCount;
+
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            let reportText = `[🇯🇵 일본어 실전회화 학습 결과 보고서]\n`;
+            reportText += `📅 작성/제출일: ${dateStr}\n\n`;
+            reportText += `📊 학습 진행 상황:\n`;
+            reportText += `- 총 문장: ${totalCount}개 중 ${masteredCount}개 완료 (${percent}% 달성)\n`;
+            reportText += `- 복습 표시(즐겨찾기): ${starredIds.size}개\n`;
+            reportText += `- 최종 상태: ${isCompletedAll ? '🎉 모든 문장 학습 완료!' : '⏳ 학습 진행 중'}\n\n`;
+
+            reportText += `✅ 완료한 회화 문장 목록:\n`;
+            const masteredList = sentences.filter(s => masteredIds.has(s.id));
+            if (masteredList.length === 0) {
+                reportText += `(아직 완료 처리된 문장이 없습니다)\n`;
+            } else {
+                masteredList.forEach((s, idx) => {
+                    reportText += `${idx + 1}. [${s.category === '1' ? '점원' : '손님'}] ${s.korean} -> ${s.japanese} (${s.koreanPron})\n`;
+                });
+            }
+
+            copyToClipboard(reportText);
+        }
+
+        function copyToClipboard(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            textarea.style.top = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+
+            try {
+                document.execCommand('copy');
+                showToast("📋 학습 결과가 클립보드에 복사되었습니다! 선생님께 전달해보세요.", "success");
+            } catch (err) {
+                showToast("복사에 실패했습니다. 다시 시도해 주세요.", "error");
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        }
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            let bgClass = "bg-slate-800 text-white";
+            let icon = "fa-circle-info text-indigo-400";
+            if (type === "success") {
+                bgClass = "bg-emerald-800 text-emerald-50 border border-emerald-700";
+                icon = "fa-circle-check text-emerald-300";
+            } else if (type === "error") {
+                bgClass = "bg-rose-800 text-rose-50 border border-rose-700";
+                icon = "fa-triangle-exclamation text-rose-300";
+            }
+
+            toast.className = `${bgClass} px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-3 text-xs sm:text-sm font-bold transition-all duration-300 transform translate-y-4 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${icon} text-base flex-shrink-0"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.remove('translate-y-4', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        window.onload = function() {
+            initApp();
+        };
+    </script>
+</body>
+</html>
