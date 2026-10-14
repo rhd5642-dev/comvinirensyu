@@ -78,4 +78,494 @@
         <!-- Navigation Tabs -->
         <div class="bg-white rounded-2xl p-2 shadow-sm border border-slate-200 mb-6 overflow-x-auto">
             <nav class="flex space-x-2 min-w-max" id="mode-nav">
-                <button data-mode="flashcard" class="mode-tab px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition flex items
+                <button data-mode="flashcard" class="mode-tab px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center space-x-2 bg-indigo-600 text-white shadow-sm">
+                    <i class="fa-solid fa-clone"></i>
+                    <span>1. 플래시카드</span>
+                </button>
+                <button data-mode="voice" class="mode-tab px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-microphone text-rose-500"></i>
+                    <span>2. AI 음성 발음 평가</span>
+                </button>
+                <button data-mode="puzzle" class="mode-tab px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-puzzle-piece text-emerald-500"></i>
+                    <span>3. 문장 조합 퀴즈</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- MODE 1: FLASHCARD -->
+        <section id="sec-flashcard" class="mode-sec flex flex-col flex-grow">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mb-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center space-x-1 overflow-x-auto pb-1 sm:pb-0" id="category-tabs">
+                        <button data-cat="ALL" class="cat-tab px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-indigo-600 text-white shadow-sm">전체 보기</button>
+                        <button data-cat="1" class="cat-tab px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">점원 표현</button>
+                        <button data-cat="2" class="cat-tab px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">손님 표현</button>
+                        <button data-cat="BOOKMARK" class="cat-tab px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1">
+                            <i class="fa-solid fa-star text-amber-400"></i>
+                            <span>즐겨찾기</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between space-x-3 text-xs sm:text-sm text-slate-600">
+                        <label class="flex items-center space-x-1.5 cursor-pointer select-none">
+                            <input type="checkbox" id="shuffle-toggle" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" checked>
+                            <span class="font-medium"><i class="fa-solid fa-shuffle text-indigo-500 mr-1"></i>랜덤</span>
+                        </label>
+                        <button id="reset-session-btn" class="text-slate-500 hover:text-indigo-600 font-medium transition flex items-center space-x-1">
+                            <i class="fa-solid fa-rotate-right"></i>
+                            <span>순서 리셋</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-2 flex items-center justify-between text-xs sm:text-sm text-slate-500 font-bold px-1">
+                <span id="progress-text">진행률: 0 / 0</span>
+                <div class="flex items-center space-x-3">
+                    <span id="star-count" class="flex items-center text-amber-500 font-bold"><i class="fa-solid fa-star mr-1"></i>0</span>
+                    <span id="mastered-count" class="flex items-center text-emerald-600 font-bold"><i class="fa-solid fa-circle-check mr-1"></i>0</span>
+                </div>
+            </div>
+            <div class="w-full bg-slate-200 h-2 rounded-full mb-6 overflow-hidden">
+                <div id="progress-bar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300 w-0"></div>
+            </div>
+
+            <div class="perspective-1000 w-full mb-6 flex-grow min-h-[340px] relative">
+                <div id="flashcard" class="card-inner w-full h-full min-h-[340px] relative rounded-3xl cursor-pointer">
+                    <!-- Front -->
+                    <div class="card-front absolute inset-0 bg-white rounded-3xl p-6 sm:p-10 shadow-md border border-slate-200/80 flex flex-col justify-between">
+                        <div class="flex justify-between items-start">
+                            <span id="card-badge" class="px-3 py-1 bg-indigo-50 text-indigo-600 font-bold text-xs rounded-full border border-indigo-100">
+                                점원 표현
+                            </span>
+                            <button id="star-btn" class="text-2xl text-slate-300 hover:text-amber-400 transition p-1">
+                                <i class="fa-solid fa-star"></i>
+                            </button>
+                        </div>
+
+                        <div class="text-center my-auto px-2">
+                            <div class="text-xs sm:text-sm font-bold text-indigo-500 uppercase tracking-wider mb-2">
+                                <i class="fa-solid fa-bullhorn mr-1"></i>다음 뜻에 맞는 일본어를 말해보세요!
+                            </div>
+                            <h2 id="korean-prompt" class="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 leading-snug break-keep">-</h2>
+                        </div>
+
+                        <div class="text-center">
+                            <span class="inline-flex items-center space-x-2 text-xs sm:text-sm text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100 px-5 py-2.5 rounded-full transition shadow-sm border border-indigo-100">
+                                <span>터치하여 정답 확인하기</span>
+                                <i class="fa-solid fa-arrow-rotate-right"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Back -->
+                    <div class="card-back absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-10 shadow-xl flex flex-col justify-between">
+                        <div class="flex justify-between items-start">
+                            <span class="px-3 py-1 bg-white/10 text-indigo-200 font-bold text-xs rounded-full border border-white/10">정답 확인</span>
+                            <div class="flex space-x-2">
+                                <button id="tts-slow-btn" title="천천히 듣기" class="bg-white/10 hover:bg-white/20 text-indigo-200 p-2.5 rounded-xl transition text-xs flex items-center space-x-1 border border-white/10">
+                                    <i class="fa-solid fa-turtle"></i>
+                                    <span class="hidden sm:inline">0.75x</span>
+                                </button>
+                                <button id="tts-btn" title="발음 듣기" class="bg-indigo-500 hover:bg-indigo-600 text-white p-2.5 rounded-xl transition shadow flex items-center space-x-1.5">
+                                    <i class="fa-solid fa-volume-high text-base"></i>
+                                    <span class="text-xs font-bold hidden sm:inline">듣기</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="text-center my-auto space-y-4 px-2">
+                            <div class="space-y-1">
+                                <span class="text-xs text-indigo-300 font-bold uppercase tracking-wider block">일본어 표현</span>
+                                <h3 id="jp-text" class="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-wide break-keep">-</h3>
+                            </div>
+
+                            <div class="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/10 max-w-lg mx-auto">
+                                <span class="text-xs text-indigo-200 block mb-1">히라가나 읽기</span>
+                                <p id="hiragana-text" class="text-lg sm:text-xl font-bold text-emerald-300 tracking-wider">-</p>
+                            </div>
+
+                            <div class="bg-amber-500/20 backdrop-blur-sm rounded-xl p-3 border border-amber-500/30 max-w-lg mx-auto">
+                                <span class="text-xs text-amber-200 block mb-1">한글 발음</span>
+                                <p id="korean-pron-text" class="text-xl sm:text-2xl font-black text-amber-300 tracking-wide">-</p>
+                            </div>
+                        </div>
+
+                        <div class="text-center">
+                            <span class="text-xs text-indigo-300">카드를 다시 누르면 문제로 돌아갑니다</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <button id="know-btn" class="py-3.5 px-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-bold text-sm sm:text-base rounded-2xl shadow-md transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-circle-check text-lg"></i>
+                    <span>알고 있어요 (완료)</span>
+                </button>
+                <button id="retry-btn" class="py-3.5 px-4 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold text-sm sm:text-base rounded-2xl shadow-md transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-rotate-left text-lg"></i>
+                    <span>다시 연습하기</span>
+                </button>
+            </div>
+
+            <div class="flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-slate-200 text-slate-600 text-sm shadow-sm">
+                <button id="prev-btn" class="hover:text-indigo-600 font-bold transition flex items-center space-x-1 p-1">
+                    <i class="fa-solid fa-chevron-left"></i>
+                    <span>이전 문장</span>
+                </button>
+                <button id="toggle-flip-btn" class="text-indigo-600 hover:text-indigo-800 font-bold transition px-4 py-2 bg-indigo-50 rounded-xl">
+                    <i class="fa-solid fa-eye mr-1"></i><span id="flip-btn-text">정답 보기</span>
+                </button>
+                <button id="next-btn" class="hover:text-indigo-600 font-bold transition flex items-center space-x-1 p-1">
+                    <span>다음 문장</span>
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- MODE 2: VOICE -->
+        <section id="sec-voice" class="mode-sec hidden flex flex-col flex-grow">
+            <div class="bg-white rounded-3xl p-6 shadow-md border border-slate-200 text-center max-w-2xl mx-auto w-full">
+                <div class="inline-block px-3 py-1 bg-rose-50 text-rose-600 font-bold text-xs rounded-full border border-rose-100 mb-3">
+                    <i class="fa-solid fa-microphone mr-1"></i>AI 음성 발음 정밀 평가
+                </div>
+                <h3 id="v-korean" class="text-2xl sm:text-3xl font-black text-slate-900 mb-2">-</h3>
+                <p id="v-target-jp" class="text-lg font-bold text-indigo-600 mb-6">-</p>
+
+                <div class="my-6 flex flex-col items-center justify-center space-y-4">
+                    <button id="v-mic-btn" class="w-24 h-24 bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white rounded-full flex flex-col items-center justify-center shadow-lg transition-transform transform active:scale-95 border-4 border-rose-200">
+                        <i class="fa-solid fa-microphone text-3xl mb-1"></i>
+                        <span class="text-[10px] font-extrabold uppercase">말하기</span>
+                    </button>
+                    <span id="v-status-msg" class="text-xs sm:text-sm font-bold text-slate-500">버튼을 누르고 일본어로 말씀하세요</span>
+                </div>
+
+                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 text-left space-y-3 mb-6">
+                    <div class="flex justify-between items-center text-xs text-slate-500 font-bold">
+                        <span>인식된 발음:</span>
+                        <span id="v-score-badge" class="px-2.5 py-1 bg-slate-200 text-slate-700 rounded-lg text-xs font-black">대기 중</span>
+                    </div>
+                    <p id="v-user-said" class="text-lg font-bold text-slate-800 min-h-[28px]">"말하기 버튼을 누르고 말씀하세요..."</p>
+                </div>
+
+                <div class="flex justify-between items-center pt-2">
+                    <button id="v-listen-target-btn" class="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs sm:text-sm font-bold rounded-xl border border-indigo-100 transition">
+                        <i class="fa-solid fa-volume-high mr-1"></i>원어민 표준 발음 듣기
+                    </button>
+                    <button id="v-next-btn" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow transition">
+                        다음 문장 <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- MODE 3: PUZZLE -->
+        <section id="sec-puzzle" class="mode-sec hidden flex flex-col flex-grow">
+            <div class="bg-white rounded-3xl p-6 shadow-md border border-slate-200 max-w-2xl mx-auto w-full text-center">
+                <div class="inline-block px-3 py-1 bg-emerald-50 text-emerald-600 font-bold text-xs rounded-full border border-emerald-100 mb-3">
+                    <i class="fa-solid fa-puzzle-piece mr-1"></i>어순 & 단어 조립 퀴즈
+                </div>
+
+                <div class="text-xs text-slate-400 font-bold mb-1">다음 뜻에 맞는 일본어 블록을 순서대로 조합하세요</div>
+                <h3 id="puz-korean" class="text-2xl sm:text-3xl font-black text-slate-900 mb-4">-</h3>
+
+                <div class="mb-5 flex justify-center">
+                    <button id="puz-hint-sound-btn" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-volume-high text-indigo-500"></i>
+                        <span>발음 힌트 듣기</span>
+                    </button>
+                </div>
+
+                <div class="min-h-[72px] bg-slate-50 border-2 border-dashed border-emerald-300 rounded-2xl p-3 flex flex-wrap items-center justify-center gap-2 mb-6" id="puz-answer-box">
+                    <span class="text-xs text-slate-400 font-bold">아래 블록을 순서대로 클릭하여 문장을 조합하세요</span>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-center gap-2.5 mb-8 min-h-[72px]" id="puz-pool-box"></div>
+
+                <div class="flex justify-between items-center pt-2">
+                    <button id="puz-reset-btn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-xl transition">
+                        <i class="fa-solid fa-arrow-rotate-left mr-1"></i>다시 맞추기
+                    </button>
+                    <button id="puz-check-btn" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow transition">
+                        정답 확인 <i class="fa-solid fa-check ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal: Add & Edit Sentence -->
+    <div id="add-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-title" class="text-lg font-black text-slate-900 flex items-center space-x-2">
+                    <i class="fa-solid fa-pen-to-square text-indigo-600"></i>
+                    <span>새로운 회화 문장 추가</span>
+                </h3>
+                <button id="close-add-modal" class="text-slate-400 hover:text-slate-600 text-xl font-bold p-1">&times;</button>
+            </div>
+            <form id="add-sentence-form" class="space-y-3">
+                <input type="hidden" id="input-edit-id">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">카테고리</label>
+                    <select id="input-category" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm outline-none">
+                        <option value="1">점원 표현</option>
+                        <option value="2">손님 표현</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">한국어 뜻</label>
+                    <input type="text" id="input-korean" required placeholder="예: 얼마인가요?" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">일본어 문장</label>
+                    <input type="text" id="input-japanese" required placeholder="예: いくらですか。" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">히라가나 읽기</label>
+                    <input type="text" id="input-hiragana" required placeholder="예: いくらですか。" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">한글 발음</label>
+                    <input type="text" id="input-korean-pron" required placeholder="예: 이쿠라데스카?" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm outline-none">
+                </div>
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" id="cancel-add-modal" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm rounded-xl">취소</button>
+                    <button type="submit" id="submit-sentence-btn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow">저장하기</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Stats & List Modal -->
+    <div id="stats-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+                <h3 class="text-lg font-black text-slate-900 flex items-center space-x-2">
+                    <i class="fa-solid fa-list-check text-indigo-600"></i>
+                    <span>학습 현황 및 문장 관리</span>
+                </h3>
+                <button id="close-stats-modal" class="text-slate-400 hover:text-slate-600 text-xl font-bold p-1">&times;</button>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-3 mb-4 text-center">
+                <div class="bg-indigo-50 p-3 rounded-2xl border border-indigo-100">
+                    <div class="text-xs text-indigo-600 font-bold mb-1">전체 문장</div>
+                    <div id="modal-total-count" class="text-xl font-black text-indigo-900">0</div>
+                </div>
+                <div class="bg-emerald-50 p-3 rounded-2xl border border-emerald-100">
+                    <div class="text-xs text-emerald-600 font-bold mb-1">완료 (알고 있음)</div>
+                    <div id="modal-mastered-count" class="text-xl font-black text-emerald-900">0</div>
+                </div>
+                <div class="bg-amber-50 p-3 rounded-2xl border border-amber-100">
+                    <div class="text-xs text-amber-600 font-bold mb-1">즐겨찾기</div>
+                    <div id="modal-starred-count" class="text-xl font-black text-amber-900">0</div>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 mb-4 flex items-center justify-between">
+                <div class="text-xs sm:text-sm font-bold text-slate-700">
+                    <i class="fa-solid fa-graduation-cap text-indigo-600 mr-1.5"></i>
+                    학습 리포트 생성 및 제출
+                </div>
+                <button id="copy-report-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm shadow transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-clipboard-check text-base"></i>
+                    <span>결과 복사하기</span>
+                </button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto space-y-2 pr-1" id="sentence-list-container"></div>
+
+            <div class="pt-4 border-t border-slate-100 flex justify-between items-center mt-2">
+                <button id="reset-all-progress-btn" class="text-xs text-rose-500 hover:text-rose-700 font-bold transition flex items-center space-x-1">
+                    <i class="fa-solid fa-arrow-rotate-left"></i>
+                    <span>학습 기록 초기화</span>
+                </button>
+                <button id="close-stats-modal-btn" class="px-5 py-2 bg-indigo-600 text-white font-bold text-sm rounded-xl">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-col space-y-2 pointer-events-none w-11/12 max-w-sm"></div>
+
+    <script>
+        // 요청해주신 구글 앱스스크립트 Web App URL이 반영되었습니다.
+        const GAS_CONV_URL = "https://script.google.com/macros/s/AKfycbxEuGhhMtBh-9WE9V5ltTRWyuNo07yXp9VFrAABz-qd-_bMPskxDSW1M5vN7mtiFvfJBg/exec";
+
+        const DEFAULT_SENTENCES = [
+            { id: 1, category: "1", korean: "어서 오세요.", japanese: "いらっしゃいませ。", hiragana: "いらっしゃいませ。", koreanPron: "이랏샤이마세" },
+            { id: 2, category: "1", korean: "다음 손님, 이쪽으로 오세요", japanese: "つぎの かた、 こちらへ どうぞ", hiragana: "つぎの かた、 こちらへ どうぞ", koreanPron: "츠기노 카타, 코치라에 도-조" },
+            { id: 3, category: "1", korean: "○○엔입니다.", japanese: "○○えんで ございま す。", hiragana: "○○えんで ございま す。", koreanPron: "○○엔데 고자이마스." },
+            { id: 4, category: "1", korean: "○○받았습니다.", japanese: "○○えん、おあずかりします。", hiragana: "○○えん、おあずかりします。", koreanPron: "○○엔, 오아즈카리시마스." },
+            { id: 5, category: "1", korean: "데워 드릴까요?", japanese: "あたためますか。", hiragana: "あたためますか。", koreanPron: "아타타메마스카?" },
+            { id: 6, category: "1", korean: "포인트 카드는 있으신가요?", japanese: "ポイントカードは おもちですか。", hiragana: "ぽいんとかーどは おもちですか。", koreanPron: "포인토카-도와 오모치데스카?" },
+            { id: 7, category: "1", korean: "봉투 필요하신가요?", japanese: "ふくろは ごりようですか。", hiragana: "ふくろは ごりようですか。", koreanPron: "후쿠로와 고리요-데스카?" },
+            { id: 8, category: "1", korean: "젓가락 필요하신가요?", japanese: "はしを おつけしますか。", hiragana: "はしを おつけしますか。", koreanPron: "하시오 오츠케시마스카?" },
+            { id: 9, category: "1", korean: "결제는 어떻게 하시겠습니까?", japanese: "お支払いは どうしますか。", hiragana: "おしはらいは どうしますか。", koreanPron: "오시하라이와 도-시마스카?" },
+            { id: 10, category: "2", korean: "실례합니다.", japanese: "すみません。", hiragana: "すみません。", koreanPron: "스미마셍" },
+            { id: 11, category: "2", korean: "○○은/는 어디에 있나요?", japanese: "○○は どこに ありますか。", hiragana: "○○は どこに ありますか。", koreanPron: "○○와 도코니 아리마스카?" },
+            { id: 12, category: "2", korean: "네 부탁드립니다", japanese: "はい、おねがいします。", hiragana: "はい、おねがいします。", koreanPron: "하이, 오네가이시마스." },
+            { id: 13, category: "2", korean: "아니요, 괜찮습니다.", japanese: "いいえ、だいじょうぶです。", hiragana: "いいえ、だいじょうぶです。", koreanPron: "이-에, 다이죠-부데스." }
+        ];
+
+        let sentences = [...DEFAULT_SENTENCES];
+        let filteredSentences = [];
+        let currentIndex = 0;
+        let isFlipped = false;
+        let activeCategory = "ALL";
+        let isShuffle = true;
+        let starredIds = new Set();
+        let masteredIds = new Set();
+        let activeMode = "flashcard";
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            recognition.interimResults = false;
+        }
+
+        async function loadSentencesFromGAS() {
+            if (!GAS_CONV_URL || GAS_CONV_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
+            try {
+                const res = await fetch(GAS_CONV_URL);
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    sentences = data.map(item => ({
+                        id: Number(item.id) || Date.now(),
+                        category: String(item.category || "1"),
+                        korean: String(item.korean || ""),
+                        japanese: String(item.japanese || ""),
+                        hiragana: String(item.hiragana || ""),
+                        koreanPron: String(item.koreanPron || "")
+                    }));
+                    showToast("구글 시트 문장을 동기화했습니다!", "success");
+                }
+            } catch (err) {
+                console.error("GAS 문장 불러오기 실패:", err);
+            }
+        }
+
+        async function saveSentencesToGAS() {
+            if (!GAS_CONV_URL || GAS_CONV_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) return;
+            showToast("구글 시트에 저장하는 중...", "info");
+            try {
+                await fetch(GAS_CONV_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'saveAllSentences', sentences: sentences })
+                });
+                showToast("구글 시트 저장 완료!", "success");
+            } catch (err) {
+                console.error("GAS 문장 저장 실패:", err);
+            }
+        }
+
+        async function initApp() {
+            await loadSentencesFromGAS();
+            applyCategoryFilter("ALL");
+            setupNavAndEvents();
+            setupVoiceEvaluation();
+            setupPuzzleQuiz();
+        }
+
+        function setupNavAndEvents() {
+            document.querySelectorAll('.mode-tab').forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    switchMode(e.currentTarget.getAttribute('data-mode'));
+                });
+            });
+
+            document.getElementById('flashcard').addEventListener('click', (e) => {
+                if (e.target.closest('#star-btn') || e.target.closest('#tts-btn') || e.target.closest('#tts-slow-btn')) return;
+                flipCard();
+            });
+
+            document.getElementById('toggle-flip-btn').addEventListener('click', flipCard);
+            document.getElementById('tts-btn').addEventListener('click', (e) => { e.stopPropagation(); playSpeech(1.0); });
+            document.getElementById('tts-slow-btn').addEventListener('click', (e) => { e.stopPropagation(); playSpeech(0.75); });
+
+            document.getElementById('star-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (filteredSentences.length === 0) return;
+                const current = filteredSentences[currentIndex];
+                if (starredIds.has(current.id)) {
+                    starredIds.delete(current.id);
+                    showToast("즐겨찾기 해제");
+                } else {
+                    starredIds.add(current.id);
+                    showToast("즐겨찾기 추가", "success");
+                }
+                updateCardDisplay();
+            });
+
+            document.getElementById('prev-btn').addEventListener('click', () => {
+                if (filteredSentences.length === 0) return;
+                currentIndex = (currentIndex - 1 + filteredSentences.length) % filteredSentences.length;
+                updateCardDisplay();
+            });
+
+            document.getElementById('next-btn').addEventListener('click', () => {
+                if (filteredSentences.length === 0) return;
+                currentIndex = (currentIndex + 1) % filteredSentences.length;
+                updateCardDisplay();
+            });
+
+            document.getElementById('know-btn').addEventListener('click', () => {
+                if (filteredSentences.length === 0) return;
+                masteredIds.add(filteredSentences[currentIndex].id);
+                showToast("완료 목록에 기록되었습니다.", "success");
+                currentIndex = (currentIndex + 1) % filteredSentences.length;
+                updateCardDisplay();
+            });
+
+            document.getElementById('retry-btn').addEventListener('click', () => {
+                if (filteredSentences.length === 0) return;
+                masteredIds.delete(filteredSentences[currentIndex].id);
+                currentIndex = (currentIndex + 1) % filteredSentences.length;
+                updateCardDisplay();
+            });
+
+            document.querySelectorAll('.cat-tab').forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    document.querySelectorAll('.cat-tab').forEach(btn => {
+                        btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-sm');
+                        btn.classList.add('bg-slate-100', 'text-slate-600');
+                    });
+                    e.currentTarget.classList.remove('bg-slate-100', 'text-slate-600');
+                    e.currentTarget.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
+                    applyCategoryFilter(e.currentTarget.getAttribute('data-cat'));
+                });
+            });
+
+            document.getElementById('shuffle-toggle').addEventListener('change', (e) => {
+                isShuffle = e.target.checked;
+                applyCategoryFilter(activeCategory);
+            });
+
+            document.getElementById('reset-session-btn').addEventListener('click', () => {
+                applyCategoryFilter(activeCategory);
+                showToast("순서를 리셋했습니다.");
+            });
+
+            const addModal = document.getElementById('add-modal');
+            document.getElementById('add-sentence-btn').addEventListener('click', () => {
+                openSentenceModal();
+            });
+            document.getElementById('close-add-modal').addEventListener('click', () => addModal.classList.add('hidden'));
+            document.getElementById('cancel-add-modal').addEventListener('click', () => addModal.classList.add('hidden'));
+
+            document.getElementById('add-sentence-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const editId = document.getElementById('input-edit-id').value;
+                const newSentence = {
+                    id: editId ? Number(editId) : Date.now(),
+                    category: document.getElementById('input-category').value,
+                    korean: document.getElementById('input-korean').value.trim(),
+                    japanese: document.getElementById('input-japanese').value.trim(),
+                    hiragana
